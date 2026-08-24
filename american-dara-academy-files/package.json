@@ -1,0 +1,23 @@
+{
+  "name": "american-dara-academy",
+  "version": "1.0.0",
+  "description": "American Dara Academy - School Management & GradeLink SIS Portal",
+  "main": "server.js",
+  "scripts": {
+    "build": "echo 'Ready'",
+    "start": "node server.js"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": [
+    "school-management",
+    "gradelink",
+    "sis",
+    "american-dara-academy"
+  ],
+  "author": "Mamadou Saliou Diallo",
+  "license": "ISC"
+}

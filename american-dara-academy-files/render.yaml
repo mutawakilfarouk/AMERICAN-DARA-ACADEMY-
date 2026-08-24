@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: american-dara-academy
+    runtime: node
+    plan: free
+    buildCommand: "echo 'Build successful'"
+    startCommand: "node server.js"
+    envVars:
+      - key: NODE_ENV
+        value: production
