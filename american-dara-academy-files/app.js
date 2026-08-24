@@ -21,7 +21,7 @@ const CLEAN_SEED_DATA = {
     address: "Route des Almadies Campus, Dakar",
     phone: "+19174788477",
     email: "saliou2007@yahoo.com",
-    website: "americandaraacademy.gradelink.com",
+    website: "american-dara-academy-1-uyy3.onrender.com",
     logoUrl: "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=200&auto=format&fit=crop&q=80",
     letterhead: {
       useImageLetterhead: false,
@@ -30,10 +30,10 @@ const CLEAN_SEED_DATA = {
       subHeader: "LOWER SCHOOL • MIDDLE SCHOOL • HIGH SCHOOL",
       accreditation: "Accredited by WASC & Ministry of National Education",
       address: "Route des Almadies Campus, Dakar",
-      contact: "Tel/WhatsApp: +19174788477 | Email: saliou2007@yahoo.com | Web: americandaraacademy.gradelink.com",
-      watermarkEnabled: true,
-      watermarkOpacity: 0.07,
-      dashboardLogoOpacity: 0.20
+      contact: "Tel/WhatsApp: +19174788477 | Email: saliou2007@yahoo.com | Web: american-dara-academy-1-uyy3.onrender.com",
+      watermarkEnabled: false,
+      watermarkOpacity: 0,
+      dashboardLogoOpacity: 0
     }
   },
   staff: [
@@ -167,7 +167,11 @@ function updateAuthUI() {
   const role = currentStaffUser ? currentStaffUser.role : 'GUEST';
 
   if (currentStaffUser) {
-    avatarEl.src = currentStaffUser.avatar || schoolData?.schoolInfo?.logoUrl || "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=200&auto=format&fit=crop&q=80";
+    if (role === 'DIRECTOR') {
+      avatarEl.src = schoolData?.schoolInfo?.logoUrl || currentStaffUser.avatar || "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=200&auto=format&fit=crop&q=80";
+    } else {
+      avatarEl.src = currentStaffUser.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80";
+    }
     nameEl.innerText = currentStaffUser.name;
     roleEl.innerText = `${currentStaffUser.role} • ${currentStaffUser.division}`;
     if (dashWelcome) dashWelcome.innerText = currentStaffUser.name;
@@ -206,12 +210,50 @@ function updateAuthUI() {
 }
 
 function openLoginModal() {
+  applyBrandingAndLetterhead();
   document.getElementById('login-modal').classList.remove('hidden');
   lucide.createIcons();
 }
 
 function closeLoginModal() {
   document.getElementById('login-modal').classList.add('hidden');
+}
+
+async function handleLoginModalLogoUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const newLogoUrl = e.target.result;
+    
+    // Update local database
+    schoolData.schoolInfo.logoUrl = newLogoUrl;
+    if (schoolData.staff && schoolData.staff.length > 0) {
+      const dir = schoolData.staff.find(s => s.role === 'DIRECTOR');
+      if (dir) dir.avatar = newLogoUrl;
+    }
+    if (currentStaffUser && currentStaffUser.role === 'DIRECTOR') {
+      currentStaffUser.avatar = newLogoUrl;
+    }
+
+    saveAppDataLocal();
+
+    // Push to live server
+    try {
+      await fetch('/api/school-info', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(schoolData.schoolInfo)
+      });
+    } catch (err) {}
+
+    applyBrandingAndLetterhead();
+    updateAuthUI();
+    showToast("Updated School Logo on Sign-In Portal!", "success");
+    confetti({ particleCount: 50, spread: 60 });
+  };
+  reader.readAsDataURL(file);
 }
 
 function handleLoginSubmit(e) {
@@ -233,14 +275,131 @@ function handleLoginSubmit(e) {
   }
 }
 
-function handleLogout() {
-  if (confirm("Are you sure you want to log out?")) {
-    currentStaffUser = null;
-    localStorage.removeItem('ada_clean_user_email');
-    updateAuthUI();
-    showToast("Logged out successfully.", "info");
+function handleProfileBadgeClick() {
+  if (currentStaffUser) {
+    openAdminProfileModal();
+  } else {
     openLoginModal();
   }
+}
+
+let tempAdminAvatarDataUrl = '';
+
+function openAdminProfileModal() {
+  if (!currentStaffUser) {
+    openLoginModal();
+    return;
+  }
+
+  const dir = (schoolData.staff || []).find(s => s.role === 'DIRECTOR') || currentStaffUser;
+  tempAdminAvatarDataUrl = dir.avatar || schoolData.schoolInfo.logoUrl || '';
+
+  const preview = document.getElementById('admin-modal-avatar-preview');
+  if (preview) preview.src = tempAdminAvatarDataUrl || "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=200&auto=format&fit=crop&q=80";
+
+  const urlInput = document.getElementById('admin-modal-avatar-url');
+  if (urlInput) urlInput.value = tempAdminAvatarDataUrl.startsWith('http') ? tempAdminAvatarDataUrl : '';
+
+  const nameInput = document.getElementById('admin-modal-name');
+  if (nameInput) nameInput.value = dir.name || 'Mamadou Saliou Diallo';
+
+  const phoneInput = document.getElementById('admin-modal-phone');
+  if (phoneInput) phoneInput.value = dir.phone || '+19174788477';
+
+  document.getElementById('admin-profile-modal').classList.remove('hidden');
+  lucide.createIcons();
+}
+
+function closeAdminProfileModal() {
+  document.getElementById('admin-profile-modal').classList.add('hidden');
+}
+
+function previewAdminAvatarFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    tempAdminAvatarDataUrl = e.target.result;
+    const preview = document.getElementById('admin-modal-avatar-preview');
+    if (preview) preview.src = tempAdminAvatarDataUrl;
+    const urlInput = document.getElementById('admin-modal-avatar-url');
+    if (urlInput) urlInput.value = '';
+    showToast("Selected new Crest Logo / Avatar image!", "info");
+  };
+  reader.readAsDataURL(file);
+}
+
+function previewAdminAvatarUrl(url) {
+  if (!url.trim()) return;
+  tempAdminAvatarDataUrl = url.trim();
+  const preview = document.getElementById('admin-modal-avatar-preview');
+  if (preview) preview.src = tempAdminAvatarDataUrl;
+}
+
+function resetAdminAvatarToDefaultLogo() {
+  tempAdminAvatarDataUrl = schoolData.schoolInfo.logoUrl || "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=200&auto=format&fit=crop&q=80";
+  const preview = document.getElementById('admin-modal-avatar-preview');
+  if (preview) preview.src = tempAdminAvatarDataUrl;
+  const urlInput = document.getElementById('admin-modal-avatar-url');
+  if (urlInput) urlInput.value = tempAdminAvatarDataUrl.startsWith('http') ? tempAdminAvatarDataUrl : '';
+  showToast("Reset to School Crest Logo.", "info");
+}
+
+async function handleSaveAdminProfile(e) {
+  e.preventDefault();
+  const name = document.getElementById('admin-modal-name').value.trim() || 'Mamadou Saliou Diallo';
+  const phone = document.getElementById('admin-modal-phone').value.trim() || '+19174788477';
+  const urlFromInput = document.getElementById('admin-modal-avatar-url').value.trim();
+  const avatarUrl = tempAdminAvatarDataUrl || urlFromInput || schoolData.schoolInfo.logoUrl;
+  const syncSchoolLogo = document.getElementById('admin-modal-sync-school-logo')?.checked === true;
+
+  // Update Director staff member
+  const dir = (schoolData.staff || []).find(s => s.role === 'DIRECTOR') || (schoolData.staff && schoolData.staff[0]);
+  if (dir) {
+    dir.name = name;
+    dir.phone = phone;
+    dir.avatar = avatarUrl;
+  }
+  if (currentStaffUser) {
+    currentStaffUser.name = name;
+    currentStaffUser.phone = phone;
+    currentStaffUser.avatar = avatarUrl;
+  }
+
+  // If checked, also update School Logo across entire school
+  if (syncSchoolLogo) {
+    schoolData.schoolInfo.logoUrl = avatarUrl;
+    schoolData.schoolInfo.phone = phone;
+  }
+
+  saveAppDataLocal();
+
+  // Send update to live server API
+  try {
+    if (dir) {
+      await fetch('/api/staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dir)
+      });
+    }
+    if (syncSchoolLogo) {
+      await fetch('/api/school-info', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(schoolData.schoolInfo)
+      });
+    }
+  } catch (err) {}
+
+  applyBrandingAndLetterhead();
+  updateAuthUI();
+  populateAllDropdowns();
+  closeAdminProfileModal();
+
+  showToast("Saved Crest Logo & Admin Profile successfully!", "success");
+  confetti({ particleCount: 60, spread: 70 });
 }
 
 // -------------------------------------------------------------
@@ -372,6 +531,15 @@ async function handleSaveLetterhead(e) {
     watermarkEnabled: formData.get('watermarkEnabled') !== null
   };
 
+  // Sync Director avatar with new School Logo
+  if (schoolData.staff && schoolData.staff.length > 0) {
+    const dir = schoolData.staff.find(s => s.role === 'DIRECTOR');
+    if (dir) dir.avatar = logoUrl;
+  }
+  if (currentStaffUser && currentStaffUser.role === 'DIRECTOR') {
+    currentStaffUser.avatar = logoUrl;
+  }
+
   saveAppDataLocal();
 
   try {
@@ -383,6 +551,7 @@ async function handleSaveLetterhead(e) {
   } catch (err) {}
 
   applyBrandingAndLetterhead();
+  updateAuthUI();
   closeLetterheadConfigModal();
   showToast("Saved School Logo & Letterhead Images successfully!", "success");
   confetti({ particleCount: 50, spread: 60 });
@@ -391,11 +560,17 @@ async function handleSaveLetterhead(e) {
 function applyBrandingAndLetterhead() {
   const info = schoolData.schoolInfo;
   const lh = info.letterhead || {};
-  const currentDomain = info.website || 'americandaraacademy.gradelink.com';
+  const currentDomain = info.website || 'american-dara-academy-1-uyy3.onrender.com';
 
   // 1. App Header Logo Icon & Domain Badge
   const headerLogo = document.getElementById('app-header-logo');
   if (headerLogo && info.logoUrl) headerLogo.src = info.logoUrl;
+
+  // 2. Avatar beside Admin/Director name in header
+  const authAvatar = document.getElementById('auth-user-avatar');
+  if (authAvatar && info.logoUrl && (!currentStaffUser || currentStaffUser.role === 'DIRECTOR')) {
+    authAvatar.src = info.logoUrl;
+  }
 
   const websiteBadge = document.getElementById('header-website-badge');
   if (websiteBadge) {
@@ -403,23 +578,12 @@ function applyBrandingAndLetterhead() {
     websiteBadge.href = `https://${currentDomain}`;
   }
 
-  // 2. Dashboard Center Background Watermark Logo with High Visibility Lighting
-  const dashBgLogo = document.getElementById('dash-bg-watermark-logo');
-  const dashWrapper = document.querySelector('.dashboard-watermark-wrapper');
-  if (dashBgLogo && info.logoUrl) {
-    dashBgLogo.src = info.logoUrl;
-  }
-  if (dashWrapper) {
-    const opVal = lh.dashboardLogoOpacity !== undefined ? lh.dashboardLogoOpacity : 0.20;
-    dashWrapper.style.opacity = opVal.toString();
-  }
+  // 3. Sign In / Login Portal Logo & School Name
+  const loginLogo = document.getElementById('login-modal-logo');
+  if (loginLogo && info.logoUrl) loginLogo.src = info.logoUrl;
 
-  // 3. Document Print Background Watermark Overlay
-  const watermarkImg = document.getElementById('print-watermark-img');
-  if (watermarkImg) {
-    if (info.logoUrl) watermarkImg.src = info.logoUrl;
-    watermarkImg.style.display = lh.watermarkEnabled !== false ? 'block' : 'none';
-  }
+  const loginSchoolName = document.getElementById('login-modal-school-name');
+  if (loginSchoolName && info.name) loginSchoolName.innerText = info.name;
 
   // 4. Official Printable Letterhead Header
   const graphicContainer = document.getElementById('print-letterhead-image-container');
@@ -1482,55 +1646,222 @@ function closeDirectorStaffModal() {
   document.getElementById('director-staff-modal').classList.add('hidden');
 }
 
-function renderDirectorStaffTable() {
-  const tbody = document.getElementById('director-staff-tbody');
-  if (!tbody) return;
-
-  tbody.innerHTML = (schoolData.staff || []).map(s => `
-    <tr class="hover:bg-slate-50 transition text-xs">
-      <td class="p-2.5 flex items-center gap-2 font-bold text-slate-900">
-        <img src="${s.avatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80'}" class="w-6 h-6 rounded-full object-cover">
-        <span>${s.name}</span>
-      </td>
-      <td class="p-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${s.role === 'DIRECTOR' ? 'bg-amber-100 text-amber-800' : (s.role === 'DEAN' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800')}">${s.role}</span></td>
-      <td class="p-2.5 text-slate-600">${s.division}</td>
-      <td class="p-2.5 font-mono text-slate-500">${s.email}</td>
-    </tr>
-  `).join('');
+function openCreateTeacherModal() {
+  if (!currentStaffUser || (currentStaffUser.role !== 'DIRECTOR' && currentStaffUser.role !== 'DEAN')) {
+    showToast("Teacher account creation is restricted to the School Director & Dean.", "error");
+    return;
+  }
+  const passInput = document.getElementById('teacher-form-password');
+  if (passInput) passInput.value = generateRandomTeacherPassword();
+  document.getElementById('create-teacher-modal').classList.remove('hidden');
+  lucide.createIcons();
 }
 
-async function handleAddStaffMember(e) {
-  e.preventDefault();
-  const form = e.target;
-  const formData = new FormData(form);
+function closeCreateTeacherModal() {
+  document.getElementById('create-teacher-modal').classList.add('hidden');
+}
 
-  const newStaff = {
-    id: `${formData.get('role')}-${Date.now().toString().slice(-4)}`,
-    name: formData.get('name').trim(),
-    role: formData.get('role'),
-    division: formData.get('division'),
-    title: formData.get('title') || `${formData.get('role')} of ${formData.get('division')}`,
-    email: formData.get('email').trim().toLowerCase(),
-    password: formData.get('password').trim(),
+function generateRandomTeacherPassword() {
+  const words = ['Dara', 'Academy', 'Excellence', 'Falcon', 'Scholar', 'Mentor', 'Campus'];
+  const word = words[Math.floor(Math.random() * words.length)];
+  const num = Math.floor(1000 + Math.random() * 9000);
+  const pwd = `${word}${num}!`;
+  const input = document.getElementById('teacher-form-password');
+  if (input) input.value = pwd;
+  return pwd;
+}
+
+async function handleCreateTeacherSubmit(e) {
+  e.preventDefault();
+  const name = document.getElementById('teacher-form-name')?.value.trim();
+  const division = document.getElementById('teacher-form-division')?.value || 'High School';
+  const subject = document.getElementById('teacher-form-subject')?.value.trim() || 'General Curriculum';
+  const email = document.getElementById('teacher-form-email')?.value.trim().toLowerCase();
+  const password = document.getElementById('teacher-form-password')?.value.trim();
+  const phone = document.getElementById('teacher-form-phone')?.value.trim() || '';
+
+  if (!name || !email || !password) {
+    showToast("Please fill in teacher name, email, and password.", "error");
+    return;
+  }
+
+  // Check if email already exists
+  const existing = (schoolData.staff || []).find(s => s.email.toLowerCase() === email.toLowerCase());
+  if (existing) {
+    showToast(`An account with email ${email} already exists!`, "error");
+    return;
+  }
+
+  const newTeacher = {
+    id: `TCH-${Date.now().toString().slice(-4)}`,
+    name: name,
+    role: "TEACHER",
+    division: division,
+    title: `Teacher of ${subject}`,
+    email: email,
+    password: password,
+    phone: phone,
     avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
   };
 
   if (!schoolData.staff) schoolData.staff = [];
-  schoolData.staff.unshift(newStaff);
+  schoolData.staff.push(newTeacher);
   saveAppDataLocal();
 
   try {
     await fetch('/api/staff', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newStaff)
+      body: JSON.stringify(newTeacher)
     });
   } catch (err) {}
 
   populateAllDropdowns();
   renderDirectorStaffTable();
-  form.reset();
-  showToast(`Created login account for ${newStaff.role}: ${newStaff.name}!`, "success");
+  closeCreateTeacherModal();
+  e.target.reset();
+
+  showToast(`Created login account for Teacher: ${name}!`, "success");
+  confetti({ particleCount: 70, spread: 70 });
+
+  // If phone is provided, prompt to send credentials via WhatsApp
+  if (phone) {
+    const sendWA = confirm(`Teacher account created!\n\nUsername: ${email}\nPassword: ${password}\n\nWould you like to send these login details to ${name} on WhatsApp now?`);
+    if (sendWA) {
+      sendTeacherCredentialsViaWhatsApp(newTeacher.id);
+    }
+  } else {
+    alert(`✅ Teacher Login Account Created Successfully!\n\n• Teacher Name: ${name}\n• Subject: ${subject} (${division})\n• Username / Login Email: ${email}\n• Password: ${password}\n\nYou can share these credentials with the teacher so they can log in.`);
+  }
+}
+
+function sendTeacherCredentialsViaWhatsApp(staffId) {
+  const staff = (schoolData.staff || []).find(s => s.id === staffId);
+  if (!staff) return;
+
+  const currentUrl = cachedWorldwideUrl || window.location.origin;
+  const message = `🦅 *AMERICAN DARA ACADEMY*\n👨‍🏫 *Teacher Portal Login Credentials*\n\nDear *${staff.name}*,\n\nYour faculty account is now active on the American Dara Academy School Management Portal:\n\n🌐 *Portal Website:* ${currentUrl}\nOfficial Domain: americandaraacademy.gradelink.com\n\n👤 *Username / Email:* ${staff.email}\n🔑 *Password:* ${staff.password}\n🏫 *Division:* ${staff.division}\n\nYou can now log in to manage your classes, create assignments (Exam, Homework, Class Work, Class Test), and record student grades.\n\n_Office of the Director_\n_American Dara Academy_`;
+
+  const phone = (staff.phone || '').replace(/[^0-9+]/g, '');
+  let waUrl = '';
+
+  if (phone) {
+    const cleanPhone = phone.startsWith('+') ? phone.slice(1) : (phone.length <= 9 ? `221${phone}` : phone);
+    waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+  } else {
+    waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+  }
+
+  window.open(waUrl, '_blank');
+  showToast(`Opened WhatsApp with login credentials for ${staff.name}!`, "success");
+}
+
+function sendTeacherCredentialsViaEmail(staffId) {
+  const staff = (schoolData.staff || []).find(s => s.id === staffId);
+  if (!staff) return;
+
+  const currentUrl = cachedWorldwideUrl || window.location.origin;
+  const subject = `Your American Dara Academy Faculty Portal Login Credentials`;
+  const body = `Dear ${staff.name},\n\nYour faculty account is now active on the American Dara Academy portal:\n\nPortal Website: ${currentUrl}\nOfficial Domain: americandaraacademy.gradelink.com\n\nUsername / Email: ${staff.email}\nPassword: ${staff.password}\nDivision: ${staff.division}\nTitle: ${staff.title}\n\nYou can now sign in to access your gradebook and student assignments.\n\nWarm regards,\nOffice of the Director\nAmerican Dara Academy`;
+
+  const mailtoUrl = `mailto:${encodeURIComponent(staff.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = mailtoUrl;
+  showToast(`Opened email compose with credentials for ${staff.name}!`, "success");
+}
+
+let staffPasswordVisibleMap = {};
+function toggleStaffPassword(staffId) {
+  staffPasswordVisibleMap[staffId] = !staffPasswordVisibleMap[staffId];
+  renderDirectorStaffTable();
+}
+
+async function deleteStaffAccount(staffId) {
+  const staff = (schoolData.staff || []).find(s => s.id === staffId);
+  if (!staff) return;
+
+  if (staff.role === 'DIRECTOR' || staff.id === 'DIR-001') {
+    showToast("The main Academy Director account cannot be deleted.", "error");
+    return;
+  }
+
+  const confirmDel = confirm(`Are you sure you want to remove the staff account for ${staff.name} (${staff.email})?`);
+  if (!confirmDel) return;
+
+  schoolData.staff = schoolData.staff.filter(s => s.id !== staffId);
+  saveAppDataLocal();
+
+  try {
+    await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(schoolData)
+    });
+  } catch (e) {}
+
+  populateAllDropdowns();
+  renderDirectorStaffTable();
+  showToast(`Removed staff account for ${staff.name}.`, "info");
+}
+
+function renderDirectorStaffTable() {
+  const tbody = document.getElementById('director-staff-tbody');
+  if (!tbody) return;
+
+  if (!schoolData.staff || schoolData.staff.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400">No staff accounts found.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = (schoolData.staff || []).map(s => {
+    const isVisible = staffPasswordVisibleMap[s.id] || false;
+    const isDirector = s.role === 'DIRECTOR' || s.id === 'DIR-001';
+
+    return `
+      <tr class="hover:bg-slate-50 transition text-xs">
+        <td class="p-3 flex items-center gap-2.5 font-bold text-slate-900">
+          <img src="${s.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}" class="w-7 h-7 rounded-full object-cover ring-1 ring-slate-200">
+          <div>
+            <div class="font-extrabold text-slate-900">${s.name}</div>
+            <div class="text-[10px] text-slate-500 font-normal">${s.title || s.role}</div>
+          </div>
+        </td>
+        <td class="p-3">
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-black ${s.role === 'DIRECTOR' ? 'bg-amber-100 text-amber-800' : (s.role === 'DEAN' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800')}">
+            ${s.role}
+          </span>
+          <div class="text-[10px] text-slate-500 mt-0.5">${s.division}</div>
+        </td>
+        <td class="p-3 font-mono font-bold text-ada-navy">
+          ${s.email}
+          ${s.phone ? `<div class="text-[10px] text-emerald-700 font-normal">${s.phone}</div>` : ''}
+        </td>
+        <td class="p-3 font-mono">
+          <div class="flex items-center gap-1.5">
+            <span class="font-bold px-2 py-0.5 bg-slate-100 rounded text-slate-800">
+              ${isVisible ? s.password : '••••••••'}
+            </span>
+            <button onclick="toggleStaffPassword('${s.id}')" title="Show/Hide Password" class="p-1 hover:bg-slate-200 rounded text-slate-500">
+              <i data-lucide="${isVisible ? 'eye-off' : 'eye'}" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </td>
+        <td class="p-3 text-right whitespace-nowrap space-x-1">
+          <button onclick="sendTeacherCredentialsViaWhatsApp('${s.id}')" title="Send Login via WhatsApp" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold inline-flex items-center gap-1 shadow-sm transition">
+            <i data-lucide="message-circle" class="w-3 h-3"></i> WhatsApp
+          </button>
+          <button onclick="sendTeacherCredentialsViaEmail('${s.id}')" title="Send Login via Email" class="px-2 py-1 bg-ada-navy hover:bg-ada-navy-light text-white rounded-lg text-[10px] font-bold inline-flex items-center gap-1 shadow-sm transition">
+            <i data-lucide="mail" class="w-3 h-3"></i> Email
+          </button>
+          ${!isDirector ? `
+            <button onclick="deleteStaffAccount('${s.id}')" title="Delete Account" class="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-[10px] font-bold inline-flex items-center transition">
+              <i data-lucide="trash-2" class="w-3 h-3"></i>
+            </button>
+          ` : ''}
+        </td>
+      </tr>
+    `;
+  }).join('');
+  lucide.createIcons();
 }
 
 // -------------------------------------------------------------
@@ -1714,7 +2045,7 @@ function generateStudentTranscriptSummary(student) {
 
   return {
     subject: `Official Academic Transcript: ${student.firstName} ${student.lastName} (${student.id}) - American Dara Academy`,
-    text: `🦅 *AMERICAN DARA ACADEMY*\n*Official Academic Transcript & Report Card*\n\nDear ${student.guardianName || 'Parent/Guardian'},\n\nHere is the official academic report for *${student.firstName} ${student.lastName}*:\n\n📋 *Student ID:* ${student.id}\n🏫 *Division:* ${student.division} (Grade ${student.grade === 0 ? 'K' : student.grade})\n🎓 *Cumulative GPA:* ${(student.gpa || 0).toFixed(2)} / 4.00\n👨‍🏫 *Assigned Teacher:* ${student.assignedTeacherName || 'Faculty Assigned'}\n\n*Subject Scores:*\n${gradeLines}\n\n🌐 View Live Portal: ${cachedWorldwideUrl}\nOfficial Domain: americandaraacademy.gradelink.com\n\n_Office of Academic Affairs_\n_American Dara Academy, Dakar_`
+    text: `🦅 *AMERICAN DARA ACADEMY*\n*Official Academic Transcript & Report Card*\n\nDear ${student.guardianName || 'Parent/Guardian'},\n\nHere is the official academic report for *${student.firstName} ${student.lastName}*:\n\n📋 *Student ID:* ${student.id}\n🏫 *Division:* ${student.division} (Grade ${student.grade === 0 ? 'K' : student.grade})\n🎓 *Cumulative GPA:* ${(student.gpa || 0).toFixed(2)} / 4.00\n👨‍🏫 *Assigned Teacher:* ${student.assignedTeacherName || 'Faculty Assigned'}\n\n*Subject Scores:*\n${gradeLines}\n\n🌐 View Live Portal: ${cachedWorldwideUrl || 'https://american-dara-academy-1-uyy3.onrender.com'}\nOfficial Website: https://american-dara-academy-1-uyy3.onrender.com\n\n_Office of Academic Affairs_\n_American Dara Academy, Dakar_`
   };
 }
 
@@ -1993,8 +2324,8 @@ function showToast(message, type = 'info') {
 // -------------------------------------------------------------
 // 10. WORLDWIDE SHARING & PHONE LOGIN (ANY WI-FI / 4G / 5G)
 // -------------------------------------------------------------
-let cachedWorldwideUrl = 'https://f6c3aa932723ae.lhr.life';
-let cachedLanUrl = 'http://172.20.10.4:3000';
+let cachedWorldwideUrl = 'https://american-dara-academy-1-uyy3.onrender.com';
+let cachedLanUrl = 'https://american-dara-academy-1-uyy3.onrender.com';
 
 async function fetchPublicPortalUrl() {
   try {
@@ -2008,28 +2339,30 @@ async function fetchPublicPortalUrl() {
       }
     }
   } catch (err) {
-    console.warn("Could not fetch remote tunnel info:", err);
+    updateAllShareElements(cachedWorldwideUrl, cachedLanUrl);
   }
 }
 
 function updateAllShareElements(url, lanUrl) {
+  const finalUrl = url || 'https://american-dara-academy-1-uyy3.onrender.com';
   const shareInput = document.getElementById('share-portal-url-input');
-  if (shareInput) shareInput.value = url;
+  if (shareInput) shareInput.value = finalUrl;
 
   const phoneInput = document.getElementById('public-remote-url-input');
-  if (phoneInput) phoneInput.value = url;
+  if (phoneInput) phoneInput.value = finalUrl;
 
   const shareQr = document.getElementById('share-qr-code-img');
-  if (shareQr) shareQr.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(url)}`;
+  if (shareQr) shareQr.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(finalUrl)}`;
 
   const phoneQr = document.getElementById('remote-qr-code-img');
-  if (phoneQr) phoneQr.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(url)}`;
+  if (phoneQr) phoneQr.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(finalUrl)}`;
 
   const lanDisplay = document.getElementById('share-lan-ip-display');
-  if (lanDisplay && lanUrl) lanDisplay.innerText = lanUrl;
+  if (lanDisplay) lanDisplay.innerText = finalUrl;
 }
 
 function openSharePortalModal() {
+  updateAllShareElements(cachedWorldwideUrl, cachedLanUrl);
   fetchPublicPortalUrl();
   document.getElementById('share-portal-modal').classList.remove('hidden');
   lucide.createIcons();
@@ -2055,21 +2388,22 @@ function copySharePortalLink() {
 }
 
 function sharePortalViaWhatsApp() {
-  const url = cachedWorldwideUrl;
-  const message = `🦅 *American Dara Academy - Staff Portal*\n\nDear Faculty & Staff,\nPlease access your gradebook, assignments, and student management portal here:\n🔗 ${url}\n\n_Official Domain: americandaraacademy.gradelink.com_`;
+  const url = cachedWorldwideUrl || 'https://american-dara-academy-1-uyy3.onrender.com';
+  const message = `🦅 *American Dara Academy - Staff Portal*\n\nDear Faculty & Staff,\nPlease access your gradebook, assignments, and student management portal here:\n🔗 ${url}\n\n_Official Website: https://american-dara-academy-1-uyy3.onrender.com_`;
   const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
   window.open(whatsappUrl, '_blank');
 }
 
 function sharePortalViaEmail() {
-  const url = cachedWorldwideUrl;
+  const url = cachedWorldwideUrl || 'https://american-dara-academy-1-uyy3.onrender.com';
   const subject = "American Dara Academy - Faculty & Staff Portal Login";
-  const body = `Dear Faculty & Staff,\n\nPlease find the official login link for the American Dara Academy School Management & GradeLink Portal:\n\nPortal Link: ${url}\nOfficial Domain: americandaraacademy.gradelink.com\n\nYou can log in directly from your laptop, tablet, or smartphone to manage course grades and assignments.\n\nWarm regards,\nOffice of the Director\nAmerican Dara Academy`;
+  const body = `Dear Faculty & Staff,\n\nPlease find the official login link for the American Dara Academy School Management & GradeLink Portal:\n\nPortal Link: ${url}\nOfficial Website: https://american-dara-academy-1-uyy3.onrender.com\n\nYou can log in directly from your laptop, tablet, or smartphone to manage course grades and assignments.\n\nWarm regards,\nOffice of the Director\nAmerican Dara Academy`;
   const mailtoUrl = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.location.href = mailtoUrl;
 }
 
 function openRemoteAccessModal() {
+  updateAllShareElements(cachedWorldwideUrl, cachedLanUrl);
   fetchPublicPortalUrl();
   document.getElementById('remote-access-modal').classList.remove('hidden');
   lucide.createIcons();

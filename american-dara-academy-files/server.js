@@ -13,7 +13,7 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 // Automatic Tunnel & Network State
-let activePublicUrl = 'https://f6c3aa932723ae.lhr.life';
+let activePublicUrl = 'https://american-dara-academy-1-uyy3.onrender.com';
 let tunnelProcess = null;
 
 function getLocalIpAddress() {
@@ -30,12 +30,22 @@ function getLocalIpAddress() {
 
 const LOCAL_LAN_IP = getLocalIpAddress();
 
-// Self-Healing Background Worldwide Tunnel (for local development)
+// Prevent any unhandled crash from stopping the server
+process.on('uncaughtException', (err) => {
+  console.error('[SERVER LOG] Notice:', err.message);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[SERVER LOG] Rejection:', reason);
+});
+
+// Self-Healing Background Worldwide Tunnel (for local laptop development only)
 function startWorldwideTunnel() {
-  if (process.env.RENDER || process.env.NODE_ENV === 'production' && !process.env.LOCAL_DEV) {
-    console.log('[CLOUD] Running natively on Render 24/7 Cloud Infrastructure!');
+  // If running in Cloud (Render, Vercel, Railway, Heroku, or Linux container), skip SSH
+  if (process.env.RENDER || process.env.PORT || process.env.NODE_ENV === 'production') {
+    console.log(`[CLOUD] American Dara Academy is running 24/7 on Cloud Port ${PORT}!`);
     return;
   }
+
   try {
     if (tunnelProcess) {
       try { tunnelProcess.kill(); } catch (e) {}
@@ -69,20 +79,20 @@ function startWorldwideTunnel() {
     });
 
     tunnelProcess.on('close', (code) => {
-      console.log(`[TUNNEL] Tunnel process exited with code ${code}. Reconnecting in 5 seconds...`);
-      setTimeout(startWorldwideTunnel, 5000);
+      if (!process.env.RENDER) {
+        setTimeout(startWorldwideTunnel, 5000);
+      }
     });
 
     tunnelProcess.on('error', (err) => {
-      console.error('[TUNNEL] Tunnel error:', err.message);
-      setTimeout(startWorldwideTunnel, 10000);
+      console.log('[TUNNEL] Local SSH tunnel skipped in cloud environment.');
     });
   } catch (err) {
-    console.error('[TUNNEL] Could not start SSH tunnel:', err.message);
+    console.log('[TUNNEL] Local SSH tunnel skipped.');
   }
 }
 
-// Start tunnel on server boot
+// Start tunnel if local
 startWorldwideTunnel();
 
 // Clean Production Database: Zero Demo Data
@@ -93,7 +103,7 @@ const CLEAN_SCHOOL_DATA = {
     address: "Route des Almadies Campus, Dakar",
     phone: "+19174788477",
     email: "saliou2007@yahoo.com",
-    website: "americandaraacademy.gradelink.com",
+    website: "american-dara-academy-1-uyy3.onrender.com",
     logoUrl: "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=200&auto=format&fit=crop&q=80",
     letterhead: {
       useImageLetterhead: false,
@@ -102,10 +112,10 @@ const CLEAN_SCHOOL_DATA = {
       subHeader: "LOWER SCHOOL • MIDDLE SCHOOL • HIGH SCHOOL",
       accreditation: "Accredited by WASC & Ministry of National Education",
       address: "Route des Almadies Campus, Dakar",
-      contact: "Tel/WhatsApp: +19174788477 | Email: saliou2007@yahoo.com | Web: americandaraacademy.gradelink.com",
-      watermarkEnabled: true,
-      watermarkOpacity: 0.07,
-      dashboardLogoOpacity: 0.20
+      contact: "Tel/WhatsApp: +19174788477 | Email: saliou2007@yahoo.com | Web: american-dara-academy-1-uyy3.onrender.com",
+      watermarkEnabled: false,
+      watermarkOpacity: 0,
+      dashboardLogoOpacity: 0
     },
     gradingScale: [
       { min: 93, grade: "A", gpa: 4.0 },
